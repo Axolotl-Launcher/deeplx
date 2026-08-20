@@ -1,6 +1,6 @@
 {
-  "name": "deeplx-serverless",
-  "version": "0.0.0",
+  "name": "deeplx-serverless-cloudflare",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "deploy": "wrangler deploy",
@@ -8,12 +8,9 @@
     "start": "wrangler dev",
     "cf-typegen": "wrangler types"
   },
-  "dependencies": {
-    "deeplx-serverless": "github:lete114/deeplx-serverless#v0.0.5"
-  },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.8.19",
-    "typescript": "^5.5.2",
+    "typescript": "^5.8.3",
     "wrangler": "^4.22.0"
   }
 }
