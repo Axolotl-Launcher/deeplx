@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
-    "lib": ["ES2022"],
+    "target": "ESNext",
+    "lib": ["ESNext"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "resolveJsonModule": true,
@@ -14,8 +14,7 @@
     "esModuleInterop": true,
     "verbatimModuleSyntax": true,
     "skipDefaultLibCheck": true,
-    "skipLibCheck": true,
-    "noUncheckedIndexedAccess": true
+    "skipLibCheck": true
   },
   "include": ["worker-configuration.d.ts", "src/**/*.ts"]
 }

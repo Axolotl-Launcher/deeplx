@@ -5,16 +5,16 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "deeplx-serverless",
-  "main": "src/worker.ts",
+  "main": "src/index.ts",
   "compatibility_date": "2025-07-01",
   "observability": {
-    "enabled": false
+    "enabled": true
   },
   /**
-   * Smart Placement - automatically places Worker near backend (DeepL API)
+   * Smart Placement
    * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
    */
-  "placement": { "mode": "smart" },
+  // "placement": { "mode": "smart" },
 
   /**
    * Bindings

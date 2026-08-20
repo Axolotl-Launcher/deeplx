@@ -1,12 +1,14 @@
 # DeepLX Serverless
 
-A free-to-deploy translation API, compatible with OwO-Network/DeepLX, built with serverless platforms to avoid frequent request issues such as HTTP 429 Too Many Requests.
+A free-to-deploy translation API, compatible with [OwO-Network/DeepLX](https://github.com/OwO-Network/DeepLX), built with serverless platforms to avoid frequent request issues such as HTTP `429 Too Many Requests`.
 
-> **Note:** For better security and to prevent misuse, it is strongly recommended to configure a `token`. Multiple tokens can be set using commas (`,`).
+> [!TIP]
+> For better security and to prevent misuse, it’s strongly recommended to configure a `token`.
+> Multiple tokens can be set using commas (`,`).
 
-## Deployment
+## 🚀 Deployment
 
-Click the one-click deploy buttons below, or fork the repository and configure the deployment manually.
+Click the one-click deploy buttons below, or [fork the repository](https://github.com/lete114/deeplx-serverless/fork) and configure the deployment manually.
 
 ### Vercel
 
@@ -34,7 +36,7 @@ Click the one-click deploy buttons below, or fork the repository and configure t
   3. Set `Package directory` to: `platform/netlify`
   4. Go to `Environment Variables` Add an environment variable: `token` (Optional)
 
-### Cloudflare Workers (Optimized)
+### Cloudflare Workers
 
 * **One-Click Deploy:**
 
@@ -42,24 +44,9 @@ Click the one-click deploy buttons below, or fork the repository and configure t
 
 * **Manual Deploy:**
 
-  1. Fork this repository and import it into Cloudflare Workers
-  2. Set `Root Directory` to: `platform/cloudflare`
-  3. Go to `Settings` → `Variables` → Add `token` (Optional, or use Secrets)
-  4. Deploy
+  1. In a similar way to **Vercel** and **Netlify**, Fork this repository and imported, with access to set up the specified deployment path and configure `token`.
 
-#### Cloudflare Workers Optimizations
-
-This deployment includes the following performance optimizations:
-
-- **Smart Placement** enabled - automatically routes Workers to data centers closest to DeepL API
-- **Zero dependencies** - all core logic inlined into a single Worker file (no npm packages at runtime)
-- **Dual-layer caching** - in-memory Map (L1) + Cloudflare Cache API (L2, 24h TTL) for instant cache hits
-- **Token pre-parsing** - tokens parsed once at module load into a Set for O(1) auth checks
-- **Ultra-fast preflight** - OPTIONS/HEAD requests return immediately with pre-built CORS headers
-- **Minimal bundle** - 2.34 KB gzipped, cold start under 1ms
-- **CPU optimized** - typical request under 0.5ms CPU time, cache hits use 0 CPU and 0 subrequests
-
-## Usage
+## 📦 Usage
 
 ### Request Example
 
@@ -102,46 +89,3 @@ curl 'https://your-api-address/translate' \
   ]
 }
 ```
-
-## Configuration
-
-### Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `token` | No | Comma-separated list of valid tokens. If not set, the API is open. |
-
-### Supported Languages
-
-All DeepL supported languages. Regional variants (e.g., `zh-HANS`, `en-GB`) are normalized to base language codes.
-
-### API Endpoint
-
-```
-POST /translate
-GET  /translate?text=...&to=...&from=...
-```
-
-Request body (JSON):
-```json
-{
-  "text": "text to translate",
-  "to": "target language code",
-  "from": "source language code (optional, default: AUTO)",
-  "source_lang": "alias for from",
-  "target_lang": "alias for to"
-}
-```
-
-## Performance Notes (Cloudflare Free Plan)
-
-- **Daily requests:** 100,000
-- **Per minute:** 1,000
-- **CPU time per request:** 10ms
-- **Subrequests per request:** 50
-
-With caching enabled, typical workloads can serve 5x+ more requests within free limits.
-
-## License
-
-MIT License - see LICENSE file for details.
