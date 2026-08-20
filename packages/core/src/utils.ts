@@ -14,8 +14,8 @@ export function authToken({ tokens, authorization, token }: { tokens: string[], 
   }
 
   if (authorization) {
-    authorization = authorization.replace('Bearer ', '').trim()
-    return tokens.includes(authorization)
+    const bearerToken = /^Bearer\s+(.+)$/i.exec(authorization)?.[1]
+    return Boolean(bearerToken && tokens.includes(bearerToken))
   }
 
   if (token) {
