@@ -31,10 +31,11 @@ export default {
     // Admin subdomain: entire host serves dashboard
     if (isAdminHost) {
       // Rewrite root to /dashboard for asset routing consistency
+      let adminUrl = url
       if (url.pathname === '/' || url.pathname === '') {
-        url.pathname = '/dashboard'
+        adminUrl = new URL('/dashboard', url)
       }
-      return handleDashboard(request, env, url)
+      return handleDashboard(request, env, adminUrl)
     }
 
     // Public API domain: deepl.addre.dpdns.org
@@ -65,46 +66,51 @@ export default {
 } satisfies ExportedHandler<IEnv>
 
 async function handleDashboard(request: Request, env: IEnv, url: URL): Promise<Response> {
-  if (!adminAuthorized(request, env)) {
-    // For HTML requests (browser navigation), return HTML with login hint instead of JSON
-    const accept = request.headers.get('Accept') || ''
-    if (accept.includes('text/html')) {
-      return new Response(
-        `<!doctype html><html><head><meta charset="utf-8"><title>需要登录</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:system-ui;padding:2rem;text-align:center}code{background:#f4f4f4;padding:.2em.4em;border-radius:4px}</style></head><body><h1>🔒 管理控制台需要登录</h1><p>此域名 <code>admin.addre.dpdns.org</code> 受 <strong>Cloudflare Zero Trust Access</strong> 保护。</p><p>仅限 Axolotl-Launcher 组织成员访问。</p><p><a href="/cdn-cgi/access/login">点击这里登录</a></p></body></html>`,
-        { status: 401, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
-      )
+  try {
+    if (!adminAuthorized(request, env)) {
+      // For HTML requests (browser navigation), return HTML with login hint instead of JSON
+      const accept = request.headers.get('Accept') || ''
+      if (accept.includes('text/html')) {
+        return new Response(
+          `<!doctype html><html><head><meta charset="utf-8"><title>需要登录</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:system-ui;padding:2rem;text-align:center}code{background:#f4f4f4;padding:.2em.4em;border-radius:4px}</style></head><body><h1>🔒 管理控制台需要登录</h1><p>此域名 <code>admin.addre.dpdns.org</code> 受 <strong>Cloudflare Zero Trust Access</strong> 保护。</p><p>仅限 Axolotl-Launcher 组织成员访问。</p><p><a href="/cdn-cgi/access/login">点击这里登录</a></p></body></html>`,
+          { status: 401, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+        )
+      }
+      return Response.json({ error: 'Cloudflare Access authentication required' }, { status: 401 })
     }
-    return Response.json({ error: 'Cloudflare Access authentication required' }, { status: 401 })
-  }
 
-  // Session state
-  if (url.pathname === '/dashboard/api/session') {
-    const email = request.headers.get('Cf-Access-Authenticated-User-Email')
-    return Response.json({ identity: { name: email?.split('@')[0] || '管理员', email: email || null }, organization: 'Axolotl-Launcher', logoutUrl: '/cdn-cgi/access/logout', accessProtected: Boolean(email), dataSource: 'production' }, { headers: { 'Cache-Control': 'no-store' } })
-  }
+    // Session state
+    if (url.pathname === '/dashboard/api/session') {
+      const email = request.headers.get('Cf-Access-Authenticated-User-Email')
+      return Response.json({ identity: { name: email?.split('@')[0] || '管理员', email: email || null }, organization: 'Axolotl-Launcher', logoutUrl: '/cdn-cgi/access/logout', accessProtected: Boolean(email), dataSource: 'production' }, { headers: { 'Cache-Control': 'no-store' } })
+    }
 
-  // Cloudflare usage stats
-  if (url.pathname === '/dashboard/api/cloudflare-usage') {
-    return Response.json(await cloudflareUsage(env), { headers: { 'Cache-Control': 'private, max-age=300' } })
-  }
+    // Cloudflare usage stats
+    if (url.pathname === '/dashboard/api/cloudflare-usage') {
+      return Response.json(await cloudflareUsage(env), { headers: { 'Cache-Control': 'private, max-age=300' } })
+    }
 
-  // API Key operations
-  if (url.pathname.startsWith('/dashboard/api/')) {
-    const path = url.pathname.slice('/dashboard/api'.length) || '/keys'
-    const stub = env.API_KEY_REGISTRY.get(env.API_KEY_REGISTRY.idFromName('registry'))
-    const upstream = await stub.fetch(new Request(`https://registry.internal${path}`, { method: request.method, headers: request.headers, body: request.method === 'GET' || request.method === 'DELETE' ? undefined : request.body }))
-    return new Response(upstream.body, { status: upstream.status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } })
-  }
+    // API Key operations
+    if (url.pathname.startsWith('/dashboard/api/')) {
+      const path = url.pathname.slice('/dashboard/api'.length) || '/keys'
+      const stub = env.API_KEY_REGISTRY.get(env.API_KEY_REGISTRY.idFromName('registry'))
+      const upstream = await stub.fetch(new Request(`https://registry.internal${path}`, { method: request.method, headers: request.headers, body: request.method === 'GET' || request.method === 'DELETE' ? undefined : request.body }))
+      return new Response(upstream.body, { status: upstream.status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } })
+    }
 
-  // Serve static assets from the ASSETS binding
-  // Map /dashboard and /dashboard/ to /index.html
-  // Map other files like /dashboard/styles.css and /dashboard/app.js to /styles.css and /app.js
-  let assetPath = '/dashboard.html'
-  if (url.pathname !== '/dashboard' && url.pathname !== '/dashboard/') {
-    assetPath = url.pathname.slice('/dashboard'.length)
-  }
+    // Serve static assets from the ASSETS binding
+    // Map /dashboard and /dashboard/ to /dashboard.html
+    // Map other files like /dashboard/styles.css and /dashboard/app.js to /styles.css and /app.js
+    let assetPath = '/dashboard.html'
+    if (url.pathname !== '/dashboard' && url.pathname !== '/dashboard/') {
+      assetPath = url.pathname.slice('/dashboard'.length)
+    }
 
-  return env.ASSETS.fetch(new Request(new URL(assetPath, url), request))
+    return env.ASSETS.fetch(new Request(new URL(assetPath, url), request))
+  } catch (err) {
+    console.error('handleDashboard error:', err)
+    return Response.json({ code: 500, msg: 'Internal server error', error: err instanceof Error ? err.message : String(err) }, { status: 500, headers: { 'Cache-Control': 'no-store' } })
+  }
 }
 
 type ManagedKeyResult = { allowed: true; token: string; legacy: boolean } | { allowed: false; response: Response }
