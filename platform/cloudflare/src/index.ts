@@ -25,33 +25,57 @@ type WorkerUsage = {
 export default {
   async fetch(request: Request, env: IEnv, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url)
+    const hostname = url.hostname
+    const isAdminHost = hostname === 'admin.addre.dpdns.org'
 
-    // Route all dashboard-related requests (assets and API) under /dashboard
-    if (url.pathname.startsWith('/dashboard')) return handleDashboard(request, env, url)
+    // Admin subdomain: entire host serves dashboard
+    if (isAdminHost) {
+      // Rewrite root to /dashboard for asset routing consistency
+      if (url.pathname === '/' || url.pathname === '') {
+        url.pathname = '/dashboard'
+      }
+      return handleDashboard(request, env, url)
+    }
+
+    // Public API domain: deepl.addre.dpdns.org
     if (url.pathname === '/favicon.ico') return env.ASSETS.fetch(request)
 
-    // Root path returns a clean diagnostic message without triggering redirects
+    // Root path returns a clean diagnostic message
     if (url.pathname === '/' || url.pathname === '') {
-      return Response.json({ name: 'DeepLX Serverless', endpoints: { translate: '/translate', admin: '/dashboard' } }, { headers: { 'Cache-Control': 'no-store' } })
+      return Response.json({ name: 'DeepLX Serverless', endpoints: { translate: '/translate' } }, { headers: { 'Cache-Control': 'no-store' } })
     }
 
-    if (request.method === 'OPTIONS' || request.method === 'HEAD') {
-      return deeplxServerless({ request, token: getTokens(env.token), cache: createTranslationCache(ctx) })
+    // Translation API (require auth)
+    if (url.pathname.startsWith('/translate')) {
+      if (request.method === 'OPTIONS' || request.method === 'HEAD') {
+        return deeplxServerless({ request, token: getTokens(env.token), cache: createTranslationCache(ctx) })
+      }
+      const managed = await consumeManagedKey(request, env)
+      if (!managed.allowed) return withCors(managed.response)
+      return deeplxServerless({
+        request,
+        token: managed.legacy ? getTokens(env.token) : [managed.token],
+        cache: createTranslationCache(ctx),
+      })
     }
 
-    const managed = await consumeManagedKey(request, env)
-    if (!managed.allowed) return withCors(managed.response)
-
-    return deeplxServerless({
-      request,
-      token: managed.legacy ? getTokens(env.token) : [managed.token],
-      cache: createTranslationCache(ctx),
-    })
+    // Explicit 404 for all other paths - prevents Assets fallback
+    return Response.json({ code: 404, msg: 'Not found' }, { status: 404, headers: { 'Cache-Control': 'no-store' } })
   },
 } satisfies ExportedHandler<IEnv>
 
 async function handleDashboard(request: Request, env: IEnv, url: URL): Promise<Response> {
-  if (!adminAuthorized(request, env)) return Response.json({ error: 'Cloudflare Access authentication required' }, { status: 401 })
+  if (!adminAuthorized(request, env)) {
+    // For HTML requests (browser navigation), return HTML with login hint instead of JSON
+    const accept = request.headers.get('Accept') || ''
+    if (accept.includes('text/html')) {
+      return new Response(
+        `<!doctype html><html><head><meta charset="utf-8"><title>需要登录</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:system-ui;padding:2rem;text-align:center}code{background:#f4f4f4;padding:.2em.4em;border-radius:4px}</style></head><body><h1>🔒 管理控制台需要登录</h1><p>此域名 <code>admin.addre.dpdns.org</code> 受 <strong>Cloudflare Zero Trust Access</strong> 保护。</p><p>仅限 Axolotl-Launcher 组织成员访问。</p><p><a href="/cdn-cgi/access/login">点击这里登录</a></p></body></html>`,
+        { status: 401, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+      )
+    }
+    return Response.json({ error: 'Cloudflare Access authentication required' }, { status: 401 })
+  }
 
   // Session state
   if (url.pathname === '/dashboard/api/session') {
